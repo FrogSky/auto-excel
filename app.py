@@ -17,6 +17,10 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
+# 版本号 - 每次发布时更新
+APP_VERSION = "1.0.4"
+APP_BUILD_TIME = "2024-04-03 15:45:00"
+
 app = Flask(__name__, template_folder='templates')
 CORS(app)
 
@@ -41,7 +45,7 @@ uploaded_files = {}
 @app.route('/')
 def index():
     """返回前端页面"""
-    return render_template('index.html')
+    return render_template('index.html', version=APP_VERSION, build_time=APP_BUILD_TIME)
 
 def allowed_file(filename):
     """检查文件扩展名是否允许"""
