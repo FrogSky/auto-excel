@@ -259,6 +259,124 @@
             color: var(--secondary-color);
             font-size: 0.9rem;
         }
+        
+        /* 归因分析样式 */
+        .quality-score {
+            font-size: 3rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        
+        .quality-grade {
+            font-size: 1.5rem;
+            font-weight: bold;
+            padding: 5px 15px;
+            border-radius: 10px;
+            display: inline-block;
+        }
+        
+        .quality-grade.A { background: #c8e6c9; color: #2e7d32; }
+        .quality-grade.B { background: #fff9c4; color: #f57f17; }
+        .quality-grade.C { background: #ffe0b2; color: #e65100; }
+        .quality-grade.D { background: #ffcdd2; color: #c62828; }
+        
+        .summary-item {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .summary-item .value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        
+        .summary-item .label {
+            font-size: 0.85rem;
+            color: var(--secondary-color);
+            margin-top: 5px;
+        }
+        
+        .correlation-item {
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .correlation-item.strong {
+            border-left-color: var(--success-color);
+        }
+        
+        .correlation-item .correlation-value {
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        
+        .outlier-item {
+            padding: 10px;
+            background: #fff3e0;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border-left: 4px solid #ff9800;
+        }
+        
+        .insight-item {
+            padding: 12px;
+            background: #e3f2fd;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .insight-item i {
+            color: var(--primary-color);
+            margin-right: 8px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--secondary-color);
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        
+        .alert-sm {
+            padding: 8px 12px;
+            font-size: 0.85rem;
+        }
+        
+        .loading-spinner {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .loading-spinner i {
+            font-size: 2rem;
+            color: var(--primary-color);
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -320,6 +438,9 @@
                         <i class="bi bi-columns"></i>
                         <span id="currentFileCols">-</span> 列
                     </span>
+                    <button class="btn btn-info btn-sm ms-2" onclick="performAttributionAnalysis()" id="attributionBtn" style="display: none;">
+                        <i class="bi bi-graph-up me-1"></i>归因分析
+                    </button>
                 </div>
 
                 <!-- 数据预览 -->
@@ -342,6 +463,56 @@
                             <ul class="pagination pagination-sm mb-0" id="pagination">
                             </ul>
                         </nav>
+                    </div>
+                </div>
+
+                <!-- 归因分析结果 -->
+                <div class="stats-card mb-4" id="attributionResults" style="display: none;">
+                    <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>归因分析结果</h5>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="closeAttributionResults()">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- 数据质量评分 -->
+                    <div class="p-3 border-bottom">
+                        <h6 class="mb-3"><i class="bi bi-shield-check me-2"></i>数据质量评估</h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="text-center">
+                                    <div class="quality-score" id="qualityScore">-</div>
+                                    <div class="quality-grade" id="qualityGrade">-</div>
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <div id="qualityIssues"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 数据概览 -->
+                    <div class="p-3 border-bottom">
+                        <h6 class="mb-3"><i class="bi bi-info-circle me-2"></i>数据概览</h6>
+                        <div class="row" id="dataSummary"></div>
+                    </div>
+                    
+                    <!-- 相关性分析 -->
+                    <div class="p-3 border-bottom">
+                        <h6 class="mb-3"><i class="bi bi-link-45deg me-2"></i>相关性分析</h6>
+                        <div id="correlationAnalysis"></div>
+                    </div>
+                    
+                    <!-- 异常值检测 -->
+                    <div class="p-3 border-bottom">
+                        <h6 class="mb-3"><i class="bi bi-exclamation-triangle me-2"></i>异常值检测</h6>
+                        <div id="outlierDetection"></div>
+                    </div>
+                    
+                    <!-- 自动洞察 -->
+                    <div class="p-3">
+                        <h6 class="mb-3"><i class="bi bi-lightbulb me-2"></i>自动洞察</h6>
+                        <div id="autoInsights"></div>
                     </div>
                 </div>
 
@@ -532,6 +703,9 @@
                 
                 updateDataTable(dataResult);
                 updateColumnsInfo(columnsResult.columns);
+                
+                // 显示归因分析按钮
+                document.getElementById('attributionBtn').style.display = 'inline-block';
                 
                 loadFiles();
             } catch (error) {
@@ -754,6 +928,188 @@
             setTimeout(() => {
                 alertDiv.remove();
             }, 3000);
+        }
+
+        // 执行归因分析
+        async function performAttributionAnalysis() {
+            if (!currentFileId) {
+                showNotification('请先选择一个文件', 'warning');
+                return;
+            }
+
+            showLoading(true);
+            try {
+                const response = await fetch(`${API_BASE}/file/${currentFileId}/attribution`);
+                if (!response.ok) {
+                    throw new Error('分析失败');
+                }
+                const result = await response.json();
+                
+                // 显示结果面板
+                document.getElementById('attributionResults').style.display = 'block';
+                
+                // 渲染各个部分
+                renderQualityScore(result.quality);
+                renderDataSummary(result.summary);
+                renderCorrelationAnalysis(result.correlation);
+                renderOutlierDetection(result.outliers);
+                renderInsights(result.insights);
+                
+                showNotification('归因分析完成', 'success');
+            } catch (error) {
+                console.error('归因分析错误:', error);
+                showNotification('归因分析失败: ' + error.message, 'danger');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 关闭归因分析结果
+        function closeAttributionResults() {
+            document.getElementById('attributionResults').style.display = 'none';
+        }
+
+        // 渲染数据质量评分
+        function renderQualityScore(quality) {
+            const scoreElement = document.getElementById('qualityScore');
+            const gradeElement = document.getElementById('qualityGrade');
+            const issuesElement = document.getElementById('qualityIssues');
+            
+            scoreElement.textContent = quality.score;
+            gradeElement.textContent = quality.grade;
+            
+            // 根据分数设置颜色
+            if (quality.score >= 80) {
+                scoreElement.style.color = '#28a745';
+            } else if (quality.score >= 60) {
+                scoreElement.style.color = '#ffc107';
+            } else {
+                scoreElement.style.color = '#dc3545';
+            }
+            
+            // 显示问题列表
+            if (quality.issues && quality.issues.length > 0) {
+                issuesElement.innerHTML = quality.issues.map(issue => 
+                    `<div class="alert alert-warning alert-sm mb-2">
+                        <i class="bi bi-exclamation-circle me-2"></i>${issue}
+                    </div>`
+                ).join('');
+            } else {
+                issuesElement.innerHTML = '<div class="alert alert-success mb-0">数据质量良好，未发现问题</div>';
+            }
+        }
+
+        // 渲染数据概览
+        function renderDataSummary(summary) {
+            const container = document.getElementById('dataSummary');
+            container.innerHTML = `
+                <div class="col-md-3 mb-2">
+                    <div class="stat-item">
+                        <div class="stat-label">总行数</div>
+                        <div class="stat-value">${summary.total_rows}</div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <div class="stat-item">
+                        <div class="stat-label">总列数</div>
+                        <div class="stat-value">${summary.total_columns}</div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <div class="stat-item">
+                        <div class="stat-label">数值列</div>
+                        <div class="stat-value">${summary.numeric_columns}</div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <div class="stat-item">
+                        <div class="stat-label">文本列</div>
+                        <div class="stat-value">${summary.text_columns}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 渲染相关性分析
+        function renderCorrelationAnalysis(correlation) {
+            const container = document.getElementById('correlationAnalysis');
+            
+            if (!correlation || correlation.length === 0) {
+                container.innerHTML = '<div class="alert alert-info">没有足够的数据进行相关性分析</div>';
+                return;
+            }
+            
+            container.innerHTML = correlation.map(item => `
+                <div class="correlation-item mb-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><strong>${item.column1}</strong> ↔ <strong>${item.column2}</strong></span>
+                        <span class="badge ${getCorrelationBadgeClass(item.correlation)}">
+                            ${item.correlation.toFixed(3)}
+                        </span>
+                    </div>
+                    <div class="progress mt-1" style="height: 6px;">
+                        <div class="progress-bar ${getCorrelationBarClass(item.correlation)}" 
+                             style="width: ${Math.abs(item.correlation) * 100}%"></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 获取相关性徽章样式
+        function getCorrelationBadgeClass(correlation) {
+            const abs = Math.abs(correlation);
+            if (abs >= 0.7) return 'bg-danger';
+            if (abs >= 0.4) return 'bg-warning';
+            return 'bg-secondary';
+        }
+
+        // 获取相关性进度条样式
+        function getCorrelationBarClass(correlation) {
+            const abs = Math.abs(correlation);
+            if (abs >= 0.7) return 'bg-danger';
+            if (abs >= 0.4) return 'bg-warning';
+            return 'bg-info';
+        }
+
+        // 渲染异常值检测
+        function renderOutlierDetection(outliers) {
+            const container = document.getElementById('outlierDetection');
+            
+            if (!outliers || outliers.length === 0) {
+                container.innerHTML = '<div class="alert alert-success">未检测到异常值</div>';
+                return;
+            }
+            
+            container.innerHTML = outliers.map(item => `
+                <div class="outlier-item mb-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><strong>${item.column}</strong></span>
+                        <span class="badge bg-danger">${item.count} 个异常值</span>
+                    </div>
+                    <div class="text-muted small mt-1">
+                        范围: ${item.lower_bound.toFixed(2)} - ${item.upper_bound.toFixed(2)}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 渲染自动洞察
+        function renderInsights(insights) {
+            const container = document.getElementById('autoInsights');
+            
+            if (!insights || insights.length === 0) {
+                container.innerHTML = '<div class="alert alert-info">暂无洞察</div>';
+                return;
+            }
+            
+            container.innerHTML = insights.map(insight => `
+                <div class="insight-item mb-2">
+                    <div class="d-flex">
+                        <i class="bi bi-lightbulb text-warning me-2 mt-1"></i>
+                        <div>${insight}</div>
+                    </div>
+                </div>
+            `).join('');
         }
 
         // 页面加载时获取文件列表

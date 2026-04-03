@@ -20,8 +20,8 @@ except ImportError:
     OPENAI_AVAILABLE = False
 
 # 版本号 - 每次发布时更新
-APP_VERSION = "1.1.0"
-APP_BUILD_TIME = "2024-04-03 16:46:00"
+APP_VERSION = "1.2.0"
+APP_BUILD_TIME = "2024-04-03 17:09:00"
 
 app = Flask(__name__, template_folder='templates')
 CORS(app)
