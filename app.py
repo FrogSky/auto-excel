@@ -5,11 +5,17 @@ import os
 from werkzeug.utils import secure_filename
 import json
 from datetime import datetime
-import openai
 from dotenv import load_dotenv
 
 # 加载环境变量
 load_dotenv()
+
+# 条件导入openai（仅在配置了API密钥时使用）
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
 
 app = Flask(__name__, template_folder='templates')
 CORS(app)
@@ -176,8 +182,8 @@ def query_data(file_id):
         
         # 使用OpenAI API进行问答
         api_key = os.getenv('OPENAI_API_KEY')
-        if not api_key:
-            # 如果没有API密钥，使用简单的规则匹配
+        if not api_key or not OPENAI_AVAILABLE:
+            # 如果没有API密钥或openai不可用，使用简单的规则匹配
             response_text = simple_query_response(question, df, analysis)
         else:
             client = openai.OpenAI(api_key=api_key)
