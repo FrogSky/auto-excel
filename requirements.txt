@@ -4,3 +4,5 @@ openpyxl
 python-dotenv
 flask-cors
 gunicorn
+numpy
+scipy

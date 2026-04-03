@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import pandas as pd
+import numpy as np
+from scipy import stats
 import os
 from werkzeug.utils import secure_filename
 import json
@@ -18,8 +20,8 @@ except ImportError:
     OPENAI_AVAILABLE = False
 
 # 版本号 - 每次发布时更新
-APP_VERSION = "1.0.5"
-APP_BUILD_TIME = "2024-04-03 16:30:00"
+APP_VERSION = "1.1.0"
+APP_BUILD_TIME = "2024-04-03 16:46:00"
 
 app = Flask(__name__, template_folder='templates')
 CORS(app)
@@ -64,6 +66,166 @@ def analyze_excel_data(df):
         'text_columns': list(df.select_dtypes(include=['object']).columns)
     }
     return analysis
+
+def perform_attribution_analysis(df):
+    """执行综合归因分析"""
+    analysis_result = {
+        'summary': {},
+        'correlation': {},
+        'distribution': {},
+        'outliers': {},
+        'data_quality': {},
+        'insights': []
+    }
+    
+    try:
+        # 1. 数据概览
+        analysis_result['summary'] = {
+            'total_rows': len(df),
+            'total_columns': len(df.columns),
+            'numeric_columns': len(df.select_dtypes(include=['number']).columns),
+            'text_columns': len(df.select_dtypes(include=['object']).columns),
+            'missing_values': int(df.isnull().sum().sum()),
+            'missing_percentage': round((df.isnull().sum().sum() / (len(df) * len(df.columns))) * 100, 2),
+            'duplicate_rows': int(df.duplicated().sum())
+        }
+        
+        # 2. 相关性分析（仅对数值列）
+        numeric_df = df.select_dtypes(include=['number'])
+        if len(numeric_df.columns) > 1:
+            corr_matrix = numeric_df.corr()
+            
+            # 找出强相关关系（绝对值 > 0.7）
+            strong_correlations = []
+            for i in range(len(corr_matrix.columns)):
+                for j in range(i+1, len(corr_matrix.columns)):
+                    corr_value = corr_matrix.iloc[i, j]
+                    if abs(corr_value) > 0.7:
+                        strong_correlations.append({
+                            'column1': corr_matrix.columns[i],
+                            'column2': corr_matrix.columns[j],
+                            'correlation': round(float(corr_value), 3),
+                            'strength': '强正相关' if corr_value > 0.7 else '强负相关'
+                        })
+            
+            analysis_result['correlation'] = {
+                'matrix': corr_matrix.round(3).to_dict(),
+                'strong_correlations': strong_correlations,
+                'top_correlations': sorted(strong_correlations, key=lambda x: abs(x['correlation']), reverse=True)[:5]
+            }
+        
+        # 3. 数据分布分析
+        distribution = {}
+        for col in numeric_df.columns:
+            col_data = numeric_df[col].dropna()
+            if len(col_data) > 0:
+                distribution[col] = {
+                    'mean': round(float(col_data.mean()), 2),
+                    'median': round(float(col_data.median()), 2),
+                    'std': round(float(col_data.std()), 2),
+                    'min': round(float(col_data.min()), 2),
+                    'max': round(float(col_data.max()), 2),
+                    'skewness': round(float(stats.skew(col_data)), 2),
+                    'kurtosis': round(float(stats.kurtosis(col_data)), 2),
+                    'quartiles': {
+                        'q1': round(float(col_data.quantile(0.25)), 2),
+                        'q2': round(float(col_data.quantile(0.5)), 2),
+                        'q3': round(float(col_data.quantile(0.75)), 2)
+                    }
+                }
+        analysis_result['distribution'] = distribution
+        
+        # 4. 异常值检测（使用IQR方法）
+        outliers = {}
+        for col in numeric_df.columns:
+            col_data = numeric_df[col].dropna()
+            if len(col_data) > 0:
+                Q1 = col_data.quantile(0.25)
+                Q3 = col_data.quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                
+                outlier_count = ((col_data < lower_bound) | (col_data > upper_bound)).sum()
+                outlier_percentage = (outlier_count / len(col_data)) * 100
+                
+                outliers[col] = {
+                    'count': int(outlier_count),
+                    'percentage': round(float(outlier_percentage), 2),
+                    'lower_bound': round(float(lower_bound), 2),
+                    'upper_bound': round(float(upper_bound), 2)
+                }
+        analysis_result['outliers'] = outliers
+        
+        # 5. 数据质量评估
+        quality_score = 100
+        quality_issues = []
+        
+        # 检查缺失值
+        missing_pct = (df.isnull().sum().sum() / (len(df) * len(df.columns))) * 100
+        if missing_pct > 20:
+            quality_score -= 20
+            quality_issues.append(f'缺失值比例过高 ({round(missing_pct, 2)}%)')
+        elif missing_pct > 10:
+            quality_score -= 10
+            quality_issues.append(f'缺失值比例较高 ({round(missing_pct, 2)}%)')
+        elif missing_pct > 5:
+            quality_score -= 5
+            quality_issues.append(f'存在少量缺失值 ({round(missing_pct, 2)}%)')
+        
+        # 检查重复行
+        duplicate_pct = (df.duplicated().sum() / len(df)) * 100
+        if duplicate_pct > 10:
+            quality_score -= 15
+            quality_issues.append(f'重复行比例过高 ({round(duplicate_pct, 2)}%)')
+        elif duplicate_pct > 5:
+            quality_score -= 8
+            quality_issues.append(f'重复行比例较高 ({round(duplicate_pct, 2)}%)')
+        
+        # 检查异常值
+        total_outliers = sum([o['count'] for o in outliers.values()])
+        total_values = sum([len(numeric_df[col].dropna()) for col in outliers.keys()])
+        if total_values > 0:
+            outlier_pct = (total_outliers / total_values) * 100
+            if outlier_pct > 10:
+                quality_score -= 10
+                quality_issues.append(f'异常值比例较高 ({round(outlier_pct, 2)}%)')
+        
+        analysis_result['data_quality'] = {
+            'score': max(0, quality_score),
+            'grade': 'A' if quality_score >= 90 else 'B' if quality_score >= 80 else 'C' if quality_score >= 70 else 'D',
+            'issues': quality_issues
+        }
+        
+        # 6. 自动生成洞察
+        insights = []
+        
+        # 相关性洞察
+        if analysis_result['correlation'].get('strong_correlations'):
+            top_corr = analysis_result['correlation']['top_correlations'][0]
+            insights.append(f"发现强相关关系：{top_corr['column1']}与{top_corr['column2']}的相关系数为{top_corr['correlation']}（{top_corr['strength']}）")
+        
+        # 分布洞察
+        for col, dist in distribution.items():
+            if abs(dist['skewness']) > 1:
+                skew_type = '右偏' if dist['skewness'] > 1 else '左偏'
+                insights.append(f"{col}数据分布呈{skew_type}态（偏度={dist['skewness']}），可能存在极端值")
+        
+        # 异常值洞察
+        outlier_cols = [col for col, o in outliers.items() if o['percentage'] > 5]
+        if outlier_cols:
+            insights.append(f"以下列存在较多异常值：{', '.join(outlier_cols)}")
+        
+        # 数据质量洞察
+        if quality_score < 80:
+            insights.append(f"数据质量评分为{quality_score}分，建议进行数据清洗")
+        
+        analysis_result['insights'] = insights
+        
+    except Exception as e:
+        analysis_result['error'] = str(e)
+    
+    return analysis_result
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
@@ -364,6 +526,29 @@ def delete_file(file_id):
         
     except Exception as e:
         return jsonify({'error': f'删除失败: {str(e)}'}), 500
+
+@app.route('/api/file/<file_id>/attribution', methods=['GET'])
+def attribution_analysis(file_id):
+    """执行归因分析"""
+    if file_id not in uploaded_files:
+        return jsonify({'error': '文件不存在'}), 404
+    
+    file_info = uploaded_files[file_id]
+    df = file_info['dataframe']
+    
+    try:
+        # 执行归因分析
+        analysis_result = perform_attribution_analysis(df)
+        
+        return jsonify({
+            'success': True,
+            'file_id': file_id,
+            'filename': file_info['filename'],
+            'analysis': analysis_result
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'分析失败: {str(e)}'}), 500
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
