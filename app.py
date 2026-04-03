@@ -20,8 +20,8 @@ except ImportError:
 app = Flask(__name__, template_folder='templates')
 CORS(app)
 
-# 配置
-UPLOAD_FOLDER = 'uploads'
+# 配置 - 使用绝对路径确保在Render上也能正常工作
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
 ALLOWED_EXTENSIONS = {'xlsx', 'xls', 'csv'}
 MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
 
@@ -29,7 +29,11 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 
 # 确保上传目录存在
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+try:
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    print(f"Upload folder created at: {UPLOAD_FOLDER}")
+except Exception as e:
+    print(f"Error creating upload folder: {e}")
 
 # 存储上传的文件数据
 uploaded_files = {}
