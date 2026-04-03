@@ -619,6 +619,8 @@
                     currentFileId = result.file_id;
                     loadFiles();
                     showMainContent(result);
+                    // 显示归因分析按钮
+                    document.getElementById('attributionBtn').style.display = 'inline-block';
                     showNotification('文件上传成功！', 'success');
                 } else {
                     showNotification(result.error || '上传失败', 'danger');
